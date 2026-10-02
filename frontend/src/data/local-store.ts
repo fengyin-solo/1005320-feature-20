@@ -2,7 +2,8 @@ import { SEED_ROWS } from './seed'
 import type { EntryRow } from './types'
 
 // 本地持久化：数据放在 localStorage 里，刷新、关掉再打开都还在。
-const STORAGE_KEY = 'archaeology-field:entries'
+// v2：影像模块新增所属探方、归档口径等字段，旧版本缓存结构不兼容，换键隔离。
+const STORAGE_KEY = 'archaeology-field:entries:v2'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T

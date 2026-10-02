@@ -16,7 +16,62 @@
         <span class="stat-label">{{ item.label }}</span>
         <strong class="stat-value">{{ item.value }}</strong>
       </article>
+      <article class="stat-card stat-accent">
+        <span class="stat-label">归档影像待引用</span>
+        <strong class="stat-value">{{ pendingCount }}</strong>
+      </article>
     </div>
+
+    <section class="citation-panel">
+      <h3>归档影像待引用清单</h3>
+      <p class="page-desc">
+        影像归档处理完成后，有效结论同步到这里作为待引用项；介质缺失等无效记录在归档环节直接退回，不进入本清单。
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>影像编号</th>
+            <th>所属探方</th>
+            <th>拍摄对象</th>
+            <th>拍摄人</th>
+            <th>归档时间</th>
+            <th>归档口径</th>
+            <th>引用状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in citations" :key="item.id">
+            <td>{{ item['影像编号'] }}</td>
+            <td>{{ item['所属探方'] }}</td>
+            <td>{{ item['拍摄对象'] }}</td>
+            <td>{{ item['拍摄人'] }}</td>
+            <td>{{ item['归档时间'] }}</td>
+            <td>{{ item['归档口径'] }}</td>
+            <td>
+              <span class="status-pill" :class="item.status === '待引用' ? 'pill-pending' : 'pill-archived'">
+                {{ item.status }}
+              </span>
+              <span v-if="item['引用简报']" class="cell-sub">已引用：{{ item['引用简报'] }}</span>
+            </td>
+            <td class="row-actions">
+              <button
+                v-if="item.status === '待引用'"
+                class="link"
+                type="button"
+                @click="markUsed(item.id)"
+              >
+                标记已引用
+              </button>
+              <span v-else class="cell-sub">已闭环</span>
+            </td>
+          </tr>
+          <tr v-if="!citations.length">
+            <td colspan="8" class="empty-state">暂无归档影像待引用项；影像确认归档后会自动同步到这里</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
     <p class="status-legend">
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
@@ -79,7 +134,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import { listCitations, markCitationUsed } from '@/data/photo-citation-store'
+import type { EntryRow, PhotoCitation } from '@/data/types'
 
 const meta = moduleMeta('briefing')
 const columns = ["简报编号", "涉及探方", "编写人", "初稿日期", "校核意见数", "校核结论", "定稿日期", "简报状态"]
@@ -91,6 +147,7 @@ const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
+const citations = ref<PhotoCitation[]>([])
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
@@ -98,6 +155,7 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+const pendingCount = computed(() => citations.value.filter((item) => item.status === '待引用').length)
 
 function resetFilters() {
   filters.value = {}
@@ -110,6 +168,16 @@ function exportRows() {
 
 function openCreate() {
   errorMessage.value = '发掘简报登记入口尚未接入审批流'
+}
+
+function markUsed(id: number) {
+  errorMessage.value = ''
+  markCitationUsed(id, '')
+  loadCitations()
+}
+
+function loadCitations() {
+  citations.value = listCitations()
 }
 
 function runAction(action: string, row: EntryRow) {
@@ -128,6 +196,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    loadCitations()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '简报校核列表读取失败'
   }
